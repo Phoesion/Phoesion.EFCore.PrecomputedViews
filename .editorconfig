@@ -1,0 +1,3 @@
+﻿[*.cs]
+# AsyncFixer02: Long-running or blocking operations inside an async method
+dotnet_diagnostic.AsyncFixer02.severity = none
