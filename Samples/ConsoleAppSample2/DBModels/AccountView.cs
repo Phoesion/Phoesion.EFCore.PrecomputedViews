@@ -24,17 +24,20 @@ namespace ConsoleAppSample2.DBModels
         public async ValueTask ComputeView(dbContext context, DependencyEvents ev, IEnumerable<Transaction> changedDependencies)
         {
             //find accounts that are affected
-            var accountIdsAffected = changedDependencies.Select(x => x.AccountId);
+            var accountIdsAffected = changedDependencies?.Select(x => x.AccountId);
+
+            // limit search space to affected accounts only (otherwise the query will run on all account entities)
+            var entities = accountIdsAffected != null ?
+                                    context.AccountViews.Where(s => accountIdsAffected.Contains(s.Id)) :
+                                    context.AccountViews;
 
             //execute update 
-            await context.AccountViews
-                            .Where(s => accountIdsAffected.Contains(s.Id))     // limit search space to affected accounts only (otherwise the query will run on all account entities)
-                            .ExecuteUpdateAsync(e => e.SetProperty(
-                                x => x.Balance,
-                                x => context.Transactions
-                                                .Where(transaction => transaction.AccountId == x.Id)
-                                                .Select(transaction => transaction.TransactionType == Transaction.TransactionTypes.Credit ? transaction.Amount : -transaction.Amount)
-                                                .Sum()));
+            await entities.ExecuteUpdateAsync(e => e.SetProperty(
+                            x => x.Balance,
+                            x => context.Transactions
+                                            .Where(transaction => transaction.AccountId == x.Id)
+                                            .Select(transaction => transaction.TransactionType == Transaction.TransactionTypes.Credit ? transaction.Amount : -transaction.Amount)
+                                            .Sum()));
         }
     }
 }

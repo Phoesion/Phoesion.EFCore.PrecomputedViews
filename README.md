@@ -109,17 +109,20 @@ public class AccountView : IComputableView<dbContext, Transaction>
     public async ValueTask ComputeView(dbContext context, DependencyEvents ev, IEnumerable<Transaction> changedDependencies)
     {
         //find accounts that are affected
-        var accountIdsAffected = changedDependencies.Select(x => x.AccountId);
+        var accountIdsAffected = changedDependencies?.Select(x => x.AccountId);
+
+        // limit search space to affected accounts only (otherwise the query will run on all account entities)
+        var entities = accountIdsAffected != null ?
+                        context.AccountViews.Where(s => accountIdsAffected.Contains(s.Id)) :
+                        context.AccountViews;
 
         //execute update 
-        await context.AccountViews
-                        .Where(s => accountIdsAffected.Contains(s.Id))     // limit search space to affected accounts only (otherwise the query will run on all account entities)
-                        .ExecuteUpdateAsync(e => e.SetProperty(
-                            x => x.Balance,
-                            x => context.Transactions
-                                            .Where(transaction => transaction.AccountId == x.Id)
-                                            .Select(transaction => transaction.TransactionType == Transaction.TransactionTypes.Credit ? transaction.Amount : -transaction.Amount)
-                                            .Sum()));
+        await entities.ExecuteUpdateAsync(e => e.SetProperty(
+                        x => x.Balance,
+                        x => context.Transactions
+                                        .Where(transaction => transaction.AccountId == x.Id)
+                                        .Select(transaction => transaction.TransactionType == Transaction.TransactionTypes.Credit ? transaction.Amount : -transaction.Amount)
+                                        .Sum()));
     }
 }
 ```
@@ -149,18 +152,21 @@ public class Course
         public async ValueTask ComputeView(dbContext context, DependencyEvents ev, IEnumerable<Enrollment> changedDependencies)
         {
             //find courses that are affected
-            var courseIds = changedDependencies.Select(e => e.CourseId);
+            var courseIdsAffected = changedDependencies?.Select(e => e.CourseId);
+
+            // limit search space to affected courses only (otherwise the query will update all course entries)
+            var entities = courseIdsAffected != null ?
+                            context.Courses.Where(s => courseIdsAffected.Contains(s.Id)) :
+                            context.Courses;
 
             //execute update
-            await context.Courses
-                        .Where(c => courseIds.Contains(c.Id))
-                        .ExecuteUpdateAsync(e => e.SetProperty(
-                            c => c.LatestEnrollmentIdAddedId,
-                            c => context.Enrollments
-                                         .Where(e => e.CourseId == c.Id)
-                                         .OrderByDescending(e => e.Id)
-                                         .Select(e => (int?)e.Id)
-                                         .FirstOrDefault()));
+            await entities.ExecuteUpdateAsync(e => e.SetProperty(
+                        c => c.LatestEnrollmentIdAddedId,
+                        c => context.Enrollments
+                                        .Where(e => e.CourseId == c.Id)
+                                        .OrderByDescending(e => e.Id)
+                                        .Select(e => (int?)e.Id)
+                                        .FirstOrDefault()));
         }
     }
 }
@@ -209,12 +215,15 @@ public class Student
         public async ValueTask ComputeView(dbContext context, DependencyEvents ev, IEnumerable<Enrollment> changedDependencies)
         {
             //find students that are affected
-            var studentIds = changedDependencies.Select(e => e.StudentId);
+            var studentIdsAffected = changedDependencies?.Select(e => e.StudentId);
+
+            // limit search space to affected students only (otherwise the query will run on all student entities)
+            var entities = studentIdsAffected != null ?
+                            context.Students.Where(s => studentIdsAffected.Contains(s.Id)) :
+                            context.Students;
 
             //execute update 
-            await context.Students
-                        .Where(s => studentIds.Contains(s.Id))
-                        .ExecuteUpdateAsync(e => e.SetProperty(
+            await entities.ExecuteUpdateAsync(e => e.SetProperty(
                             s => s.EnrollmentCount,
                             s => context.Enrollments.Count(e => e.StudentId == s.Id)));
         }

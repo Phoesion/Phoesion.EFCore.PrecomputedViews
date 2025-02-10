@@ -31,16 +31,19 @@ namespace ConsoleAppSample1.DBModels
             public async ValueTask ComputeView(dbContext context, DependencyEvents ev, IEnumerable<Enrollment> changedDependencies)
             {
                 //find students that are affected
-                var studentIdsAffected = changedDependencies.Select(x => x.StudentId);
+                var studentIdsAffected = changedDependencies?.Select(x => x.StudentId);
+
+                // limit search space to affected students only (otherwise the query will run on all student entities)
+                var entities = studentIdsAffected != null ?
+                                        context.Students.Where(s => studentIdsAffected.Contains(s.Id)) :
+                                        context.Students;
 
                 //execute update 
-                await context.Students
-                                .Where(s => studentIdsAffected.Contains(s.Id))     // limit search space to affected students only (otherwise the query will run on all student entities)
-                                .ExecuteUpdateAsync(e => e.SetProperty(
-                                    x => x.EnrollmentCount,
-                                    x => context.Enrollments
-                                                    .Where(enroll => enroll.StudentId == x.Id)
-                                                    .Count()));
+                await entities.ExecuteUpdateAsync(e => e.SetProperty(
+                                x => x.EnrollmentCount,
+                                x => context.Enrollments
+                                                .Where(enroll => enroll.StudentId == x.Id)
+                                                .Count()));
             }
         }
     }

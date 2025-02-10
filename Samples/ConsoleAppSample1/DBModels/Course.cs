@@ -32,18 +32,21 @@ namespace ConsoleAppSample1.DBModels
             public async ValueTask ComputeView(dbContext context, DependencyEvents ev, IEnumerable<Enrollment> changedDependencies)
             {
                 //find courses that are affected
-                var courseIdsAffected = changedDependencies.Select(x => x.CourseId);
+                var courseIdsAffected = changedDependencies?.Select(x => x.CourseId);
+
+                // limit search space to affected courses only (otherwise the query will update all course entries)
+                var entities = courseIdsAffected != null ?
+                                        context.Courses.Where(s => courseIdsAffected.Contains(s.Id)) :
+                                        context.Courses;
 
                 //execute update
-                await context.Courses
-                                .Where(c => courseIdsAffected.Contains(c.Id))     // limit search space to affected courses only (otherwise the query will update all course entries)
-                                .ExecuteUpdateAsync(e => e.SetProperty(
-                                    x => x.LatestEnrollmentIdAddedId,
-                                    x => context.Enrollments
-                                                    .Where(enroll => x.Id == enroll.CourseId)
-                                                    .OrderByDescending(enroll => enroll.Id)
-                                                    .Select(enroll => (int?)enroll.Id)
-                                                    .FirstOrDefault()));
+                await entities.ExecuteUpdateAsync(e => e.SetProperty(
+                                x => x.LatestEnrollmentIdAddedId,
+                                x => context.Enrollments
+                                                .Where(enroll => x.Id == enroll.CourseId)
+                                                .OrderByDescending(enroll => enroll.Id)
+                                                .Select(enroll => (int?)enroll.Id)
+                                                .FirstOrDefault()));
             }
         }
     }
