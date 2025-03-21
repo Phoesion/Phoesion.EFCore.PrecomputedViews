@@ -78,6 +78,45 @@ namespace ConsoleAppSample2
                 Console.WriteLine($"Account3.Balance = {res3}");
             }
 
+            //reset views, so we can run the initializer as if they were never computed
+            Console.WriteLine("");
+            Console.WriteLine("Resetting views, so we can run the initializer as if they were never computed...");
+            await using (var db = new dbContext())
+                await db.AccountViews.ExecuteUpdateAsync(v => v.SetProperty(x => x.Balance, 0));
+
+            //run initializer
+            Console.WriteLine("Running initializer...");
+            await using (var db = new dbContext())
+            {
+                var statusUpdater = Phoesion.EFCore.PrecomputedViews.PrecomputedViewInitializer.InititializeViewWithStatusAsync(
+                    db, // db context
+                    db => db.AccountViews, // select the dbSet
+                    view => view.Id,    //select the key to be used as the cursor for collecting batches ( must be an ordered numeric type )
+                    500,    //select the batch size for each computation
+                    AccountView.RunUpdateForEntities //handler to update each batch
+                    );
+
+                await foreach (var (from, to) in statusUpdater)
+                    Console.WriteLine($"Processing items {from} to {to} ...");
+            }
+
+            //Print results
+            Console.WriteLine("");
+            Console.WriteLine("Results after initializer:");
+            await using (var db = new dbContext())
+            {
+                var res1 = await db.Account.Where(c => c.Id == 1).Select(c => c.View.Balance).FirstOrDefaultAsync();
+                Console.WriteLine($"Account1.Balance = {res1}");
+
+                //Get from account 2
+                var res2 = await db.Account.Where(c => c.Id == 2).Select(c => c.View.Balance).FirstOrDefaultAsync();
+                Console.WriteLine($"Account2.Balance = {res2}");
+
+                //Get from account 3
+                var res3 = await db.Account.Where(c => c.Id == 3).Select(c => c.View.Balance).FirstOrDefaultAsync();
+                Console.WriteLine($"Account3.Balance = {res3}");
+            }
+
             //done
             Console.WriteLine("");
             Console.WriteLine("Press any key to continue...");

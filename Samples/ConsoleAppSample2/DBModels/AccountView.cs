@@ -32,12 +32,16 @@ namespace ConsoleAppSample2.DBModels
                                     context.AccountViews;
 
             //execute update 
-            await entities.ExecuteUpdateAsync(e => e.SetProperty(
+            await RunUpdateForEntities(context, entities);
+        }
+
+        //the update method used by ComputeView() and Initializer
+        public static Task RunUpdateForEntities(dbContext context, IQueryable<AccountView> entities)
+            => entities.ExecuteUpdateAsync(e => e.SetProperty(
                             x => x.Balance,
                             x => context.Transactions
                                             .Where(transaction => transaction.AccountId == x.Id)
                                             .Select(transaction => transaction.TransactionType == Transaction.TransactionTypes.Credit ? transaction.Amount : -transaction.Amount)
                                             .Sum()));
-        }
     }
 }
